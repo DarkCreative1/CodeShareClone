@@ -126,7 +126,7 @@ Kullanıcı yaz → throttledBroadcast (60ms) → diğer oda üyelerine anlık g
 
 ## 📄 Lisans
 
-Bu proje eğitim/dem amaçlıdır. Dilediğiniz gibi kullanabilirsiniz.
+MIT Lisansı altında dağıtılmaktadır. Detaylar için [LICENSE](./LICENSE) dosyasına bakın.
 
 ---
 
