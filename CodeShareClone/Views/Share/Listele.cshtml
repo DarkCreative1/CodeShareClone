@@ -1,0 +1,59 @@
+﻿@model IEnumerable<CodeShareClone.Models.Code>
+@{
+    ViewData["Title"] = "Listele";
+}
+<h1 class="text-light">Listele</h1>
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New</a>
+</p>
+<style>
+    .code-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .code-content {
+        white-space: nowrap; /* tek satır */
+        overflow: hidden; /* taşanı gizle */
+        text-overflow: ellipsis; /* ... ile kes */
+        font-family: Consolas, monospace;
+        display: block;
+        max-width: 100%;
+    }
+
+    .action-column {
+        width: 150px;
+        white-space: nowrap;
+    }
+    a:hover {
+  color: lightgray; 
+}
+
+</style>
+<table class="table table-dark table-striped code-table">
+    <thead>
+        <tr>
+            <th class="text-light">
+                @Html.DisplayNameFor(model => model.Content)
+            </th>
+            <th class="text-light action-column">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td class="text-light">
+                    <div class="code-content">
+                        @Html.DisplayFor(modelItem => item.Content)
+                    </div>
+                </td>
+                <td class="text-light action-column">
+                    <a asp-action="ViewCode" class="badge rounded-pill bg-primary" style="text-decoration:none" asp-route-id="@item.Id">View</a>
+                    |
+                    <a asp-action="sil" class="badge rounded-pill bg-danger" style="text-decoration:none" asp-route-id="@item.Id">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

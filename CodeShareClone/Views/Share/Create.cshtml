@@ -1,0 +1,119 @@
+﻿@model CodeShareClone.Models.Code
+@{
+    ViewData["Title"] = "Create";
+}
+
+<style>
+    .page-wrapper {
+        max-width: 1000px;
+        margin: 30px auto;
+    }
+
+    .page-title {
+        color: #d4d4d4;
+        font-family: 'Consolas', 'Fira Code', monospace;
+        margin-bottom: 8px;
+    }
+
+    .editor-body {
+        background: #000;
+        display: flex;
+        font-family: 'Consolas', 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        border-radius: 6px;
+        overflow: hidden;
+        height: auto;
+    }
+
+    .line-numbers {
+        background: #000;
+        color: #5a5a5a;
+        text-align: right;
+        padding: 16px 10px;
+        user-select: none;
+        min-width: 45px;
+        overflow: hidden;
+        border-right: 1px solid #222;
+        white-space: pre;
+    }
+
+    .code-input {
+        flex: 1;
+        margin: 0;
+        padding: 16px;
+        border: 0;
+        resize: none;
+        outline: none;
+        background: transparent;
+        color: #d4d4d4;
+        caret-color: #fff;
+        font-family: 'Consolas', 'Fira Code', monospace !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        white-space: pre;
+        overflow: auto;
+        box-sizing: border-box;
+        tab-size: 4;
+    }
+
+    .btn-share {
+        margin-top: 16px;
+    }
+</style>
+
+<div class="page-wrapper">
+    <h1 class="page-title">Create</h1>
+
+    <form asp-action="Create" method="post">
+        <div class="editor-body">
+            <div class="line-numbers" id="lineNumbers">1</div>
+            <textarea asp-for="Content" class="code-input" id="codeInput" spellcheck="false"></textarea>
+        </div>
+        <span asp-validation-for="Content" class="text-danger"></span>
+
+        <div>
+            <button type="submit" class="btn btn-primary btn-share">
+                Share Code
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        const codeInput = document.getElementById('codeInput');
+        const lineNumbers = document.getElementById('lineNumbers');
+
+        function updateLineNumbers() {
+            const lines = codeInput.value.split('\n').length;
+            let html = '';
+            for (let i = 1; i <= lines; i++) html += i + '\n';
+            lineNumbers.textContent = html;
+        }
+
+        function syncScroll() {
+            lineNumbers.scrollTop = codeInput.scrollTop;
+        }
+
+        codeInput.addEventListener('input', updateLineNumbers);
+        codeInput.addEventListener('scroll', syncScroll);
+
+        codeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = codeInput.selectionStart;
+                const end = codeInput.selectionEnd;
+                codeInput.value = codeInput.value.substring(0, start) + '    ' + codeInput.value.substring(end);
+                codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+                updateLineNumbers();
+            }
+        });
+
+        updateLineNumbers();
+    </script>
+}

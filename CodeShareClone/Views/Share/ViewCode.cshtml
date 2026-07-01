@@ -1,0 +1,203 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@{
+    ViewBag.Title = "Kod Görüntüleyici";
+}
+@model CodeShareClone.Models.Code
+@using System.Text.Json
+<style>
+    /* 1. Sayfanın en dışındaki boşlukları sıfırlıyoruz */
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden; /* Sayfanın kendisinde scroll olmasın */
+    }
+
+    /* 2. Layout'taki kısıtlamaları kaldırıyoruz */
+    .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    main.pb-3 {
+        padding-bottom: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Navbar'ın altındaki 1rem'lik (mb-3) boşluğu kaldırıyoruz */
+    .navbar {
+        margin-bottom: 0 !important;
+    }
+    /* 4. Editör kutusu */
+    .editor-body {
+        background: #000;
+        display: flex;
+        font-family: 'Consolas', 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        border-radius: 0;
+        overflow: hidden;
+        width: 100vw;
+        /* Navbar'ın yüksekliği hariç ekranın geri kalanını kaplar */
+        height: calc(100vh - 72px); /* Navbar + padding toplamı yaklaşık 72px civarıdır */
+        margin: 0;
+    }
+
+    /* Diğer CSS kodların (line-numbers, code-input vb.) aynı kalabilir */
+    .line-numbers {
+        background: #000;
+        color: #5a5a5a;
+        text-align: right;
+        padding: 16px 10px;
+        user-select: none;
+        min-width: 45px;
+        overflow: hidden;
+        border-right: 1px solid #222;
+        white-space: pre;
+    }
+
+    .code-input {
+        flex: 1;
+        padding: 16px;
+        border: 0;
+        resize: none;
+        outline: none;
+        background: transparent;
+        color: #d4d4d4;
+        caret-color: #fff;
+        font-family: 'Consolas', 'Fira Code', monospace !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        white-space: pre;
+        overflow: auto;
+        box-sizing: border-box;
+        tab-size: 4;
+    }
+
+    footer {
+        display: none !important;
+    }
+</style>
+
+<div class="editor-body">
+    <div class="line-numbers" id="lineNumbers">1</div>
+    <textarea class="code-input" id="codeInput" spellcheck="false"></textarea>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@@8.0.0/dist/browser/signalr.min.js"></script>
+<script>
+    const codeInput = document.getElementById('codeInput');
+    const lineNumbers = document.getElementById('lineNumbers');
+
+    const codeId = "@Model.Id";
+
+    const originalContent = @Html.Raw(JsonSerializer.Serialize(Model.Content ?? ""));
+    codeInput.value = originalContent;
+
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/codehub")
+        .withAutomaticReconnect()
+        .build();
+
+    let isRemoteUpdate = false;
+
+    connection.on("ReceiveContent", (content) => {
+        if (content === codeInput.value) return;
+
+        const cursorPos = codeInput.selectionStart;
+        const lengthDiff = content.length - codeInput.value.length;
+
+        isRemoteUpdate = true;
+        codeInput.value = content;
+        const newPos = Math.max(0, cursorPos + lengthDiff);
+        codeInput.selectionStart = codeInput.selectionEnd = newPos;
+        isRemoteUpdate = false;
+
+        updateLineNumbers();
+    });
+
+    connection.start()
+        .then(() => connection.invoke("JoinRoom", codeId))
+        .catch(err => console.error("SignalR bağlantı hatası:", err));
+
+    const BROADCAST_MS = 60;
+    let lastBroadcastAt = 0;
+    let broadcastTrailingTimer = null;
+
+    function throttledBroadcast() {
+        const now = Date.now();
+        const elapsed = now - lastBroadcastAt;
+
+        if (elapsed >= BROADCAST_MS) {
+            lastBroadcastAt = now;
+            connection.invoke("BroadcastContent", codeId, codeInput.value)
+                .catch(err => console.error(err));
+        } else if (!broadcastTrailingTimer) {
+            broadcastTrailingTimer = setTimeout(() => {
+                broadcastTrailingTimer = null;
+                lastBroadcastAt = Date.now();
+                connection.invoke("BroadcastContent", codeId, codeInput.value)
+                    .catch(err => console.error(err));
+            }, BROADCAST_MS - elapsed);
+        }
+    }
+    
+    const PERSIST_MS = 800;
+    let persistTimer = null;
+
+    function debouncedPersist() {
+        clearTimeout(persistTimer);
+        persistTimer = setTimeout(() => {
+            connection.invoke("PersistContent", codeId, codeInput.value)
+                .catch(err => console.error(err));
+        }, PERSIST_MS);
+    }
+
+    function sendUpdate() {
+        if (isRemoteUpdate) return; // kendi gönderdiğimiz güncellemeyi tekrar yollama
+        throttledBroadcast();
+        debouncedPersist();
+    }
+
+    function updateLineNumbers() {
+        const lines = codeInput.value.split('\n').length;
+        let html = '';
+        for (let i = 1; i <= lines; i++) html += i + '\n';
+        lineNumbers.textContent = html;
+    }
+
+    function syncScroll() {
+        lineNumbers.scrollTop = codeInput.scrollTop;
+    }
+
+    codeInput.addEventListener('input', () => {
+        updateLineNumbers();
+        sendUpdate();
+    });
+
+    codeInput.addEventListener('scroll', syncScroll);
+
+    codeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = codeInput.selectionStart;
+            const end = codeInput.selectionEnd;
+            codeInput.value = codeInput.value.substring(0, start) + '    ' + codeInput.value.substring(end);
+            codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+            updateLineNumbers();
+            sendUpdate();
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        if (persistTimer) {
+            clearTimeout(persistTimer);
+            connection.invoke("PersistContent", codeId, codeInput.value).catch(() => {});
+        }
+    });
+
+    updateLineNumbers();
+</script>
